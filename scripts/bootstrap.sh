@@ -109,9 +109,11 @@ echo "  Compose: $(docker compose version)"
 echo "  Nginx:   $(nginx -v 2>&1)"
 echo "  Certbot: $(certbot --version 2>&1)"
 echo "  UFW:     $(ufw status | head -1)"
-nginx -t
-systemctl is-active nginx
-docker info >/dev/null && echo "  Docker daemon: активен"
+nginx -t || echo "  ВНИМАНИЕ: nginx -t не прошёл (см. вывод выше)"
+systemctl is-active nginx || echo "  ВНИМАНИЕ: nginx не активен"
+docker info >/dev/null 2>&1 \
+    && echo "  Docker daemon: активен" \
+    || echo "  ВНИМАНИЕ: docker info упал"
 echo
 echo "Дальше: переключитесь на пользователя joplin, скопируйте проект"
 echo "в /opt/joplin/ и запустите ./scripts/deploy.sh"
