@@ -106,7 +106,13 @@ sudo ./scripts/bootstrap.sh
   (защита от self-lockout);
 - доустановит недостающие пакеты, Docker Engine + compose plugin;
 - создаст пользователя `joplin` и каталоги `/opt/joplin`, `/var/backups/joplin`,
-  `/var/www/certbot`;
+  `/var/www/certbot`. При первичном создании генерирует пароль для `joplin`
+  и сохраняет его в `/root/joplin-password.txt` (`0600`, владелец root).
+  Повторный запуск пароль не перетирает;
+- добавит `joplin` в группу `docker` и установит `/etc/sudoers.d/joplin`
+  (`NOPASSWD: ALL`) — `deploy.sh` запускается от joplin и вызывает sudo
+  для nginx/certbot/crontab. Реальных прав не повышает: членство в `docker`
+  и так эквивалентно root через привилегированный контейнер;
 - настроит UFW (если не активен — включит с deny incoming; если активен —
   только добавит правила SSH/80/443 без смены дефолтов).
 
@@ -117,6 +123,24 @@ sudo chown -R joplin:joplin /opt/joplin
 ```
 
 ### 4. Первичный деплой стека (от пользователя joplin)
+
+**Перед запуском проверьте NTP.** Joplin Server при старте сверяет системное
+время с NTP, и если сервер недоступен, контейнер уходит в бесконечный
+restart-loop с ошибкой `Cannot retrieve the network time`. Многие VPS-провайдеры
+блокируют UDP/123 на публичные NTP вроде `pool.ntp.org` — поэтому в `.env.example`
+по умолчанию указан NTP, разрешённый провайдером HostKey:
+
+```bash
+# Проверка, что NTP из .env достижим с VPS
+sudo apt-get install -y ntpdate >/dev/null
+NTP_HOST=$(awk -F'[=:]' '/^NTP_SERVER/{print $2}' /opt/joplin/.env)
+sudo ntpdate -q "$NTP_HOST"
+# Ожидается строка "adjust time server X.X.X.X offset ..."
+```
+
+Если провайдер другой — возьмите имя живого NTP из вывода
+`chronyc sources` (status `^*`) или `/etc/chrony/chrony.conf` и поправьте
+`NTP_SERVER` в `/opt/joplin/.env` до запуска `deploy.sh`. Запуск:
 
 ```bash
 sudo -u joplin bash -lc 'cd /opt/joplin && ./scripts/deploy.sh'
@@ -257,6 +281,8 @@ sudo crontab -u joplin -l
 | crontab пользователя `joplin` | deploy | задача backup.sh |
 | `/etc/logrotate.d/joplin-backup` | deploy | ротация логов |
 | Системный пользователь `joplin` (uid auto), группа `docker` | bootstrap | владелец стека |
+| `/etc/sudoers.d/joplin` | bootstrap | `NOPASSWD: ALL` для пользователя joplin |
+| `/root/joplin-password.txt` | bootstrap (первый запуск) | пароль пользователя joplin (`0600`, root) |
 | UFW-правила: SSH-порт, 80/tcp, 443/tcp | bootstrap | firewall |
 | TCP `127.0.0.1:22300` | docker compose | публикуемый порт Joplin |
 
@@ -289,7 +315,8 @@ sudo crontab -u joplin -e   # удалить строку с backup.sh
 # 6. Удалить logrotate-конфиг
 sudo rm -f /etc/logrotate.d/joplin-backup
 
-# 7. (опционально) Удалить пользователя
+# 7. (опционально) Удалить пользователя, его sudoers-правило и файл с паролем
+sudo rm -f /etc/sudoers.d/joplin /root/joplin-password.txt
 sudo userdel -r joplin
 ```
 

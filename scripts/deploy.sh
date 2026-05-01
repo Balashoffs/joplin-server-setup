@@ -8,6 +8,13 @@ cd "$(dirname "$0")/.."
 PROJECT_DIR="$(pwd)"
 
 # === Пред-проверки ===
+if [[ $EUID -eq 0 ]]; then
+    echo "Запускать от пользователя joplin, не root." >&2
+    echo "  sudo -u joplin bash -lc 'cd /opt/joplin && ./scripts/deploy.sh'" >&2
+    echo "Иначе .env и сгенерированные файлы окажутся с владельцем root." >&2
+    exit 1
+fi
+
 if [[ "$PROJECT_DIR" != "/opt/joplin" ]]; then
     echo "Ожидался /opt/joplin, текущий каталог: $PROJECT_DIR" >&2
     exit 1
@@ -23,7 +30,7 @@ if ! docker compose version >/dev/null 2>&1; then
     exit 1
 fi
 
-if ! ufw status | grep -qw active; then
+if ! sudo ufw status | grep -qw active; then
     echo "UFW не активен. Сначала bootstrap.sh" >&2
     exit 1
 fi
@@ -62,10 +69,9 @@ docker compose pull
 echo "==> docker compose up -d"
 docker compose up -d
 
-echo "==> Ожидание Joplin на 127.0.0.1:22300"
-curl -fsS --retry 30 --retry-delay 2 -o /dev/null \
-    http://127.0.0.1:22300/api/ping
-echo "  Joplin отвечает локально"
+# echo "==> Ожидание Joplin на 127.0.0.1:22300"
+# curl -fsS --retry 30 --retry-delay 2 -o /dev/null http://127.0.0.1:22300/api/ping
+#echo "  Joplin отвечает локально"
 
 # === Nginx ===
 NGINX_AVAILABLE=/etc/nginx/sites-available/owl.hello-vanilla.ru.conf
