@@ -52,11 +52,37 @@ Self-hosted развёртывание [Joplin Server](https://github.com/lauren
 
 ### 2. Залить проект на VPS
 
+С локальной машины. Подставьте свой SSH-порт, путь к ключу, имя пользователя
+и IP/домен VPS:
+
 ```bash
-# с локальной машины
+SSH_PORT=2222                         # ← ваш нестандартный SSH-порт
+SSH_KEY="$HOME/.ssh/id_ed25519"       # ← путь к приватному ключу
+VPS_USER=ubuntu                       # ← ваш пользователь на VPS
+VPS_HOST=owl.hello-vanilla.ru         # ← IP или домен VPS
+
 rsync -av --exclude='.git' --exclude='data/' \
-  /Users/bau/Documents/joplin/ \
-  user@VPS_IP:/tmp/joplin-bootstrap/
+  -e "ssh -p ${SSH_PORT} -i ${SSH_KEY}" \
+  ~/Documents/joplin/ \
+  "${VPS_USER}@${VPS_HOST}:/tmp/joplin-bootstrap/"
+```
+
+Альтернатива — настроить алиас в `~/.ssh/config`:
+
+```sshconfig
+Host joplin-vps
+    HostName owl.hello-vanilla.ru
+    User ubuntu
+    Port 2222
+    IdentityFile ~/.ssh/id_ed25519
+```
+
+…тогда команда упрощается:
+
+```bash
+rsync -av --exclude='.git' --exclude='data/' \
+  ~/Documents/joplin/ \
+  joplin-vps:/tmp/joplin-bootstrap/
 ```
 
 ### 3. Первичная подготовка хоста (root)
