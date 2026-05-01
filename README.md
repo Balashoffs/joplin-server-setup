@@ -117,11 +117,13 @@ admin@localhost / admin
 
 ### 6. (опционально) Включить HSTS
 
-Только после того как убедились, что HTTPS работает корректно:
+Только после того как убедились, что HTTPS работает корректно. Простейший
+способ — `sudoedit`:
 
 ```bash
-sudo sed -i '/listen 443 ssl/a \    add_header Strict-Transport-Security "max-age=31536000" always;' \
-  /etc/nginx/sites-available/owl.hello-vanilla.ru.conf
+sudoedit /etc/nginx/sites-available/owl.hello-vanilla.ru.conf
+# В блоке `server { listen 443 ssl; ... }` добавьте строку:
+#   add_header Strict-Transport-Security "max-age=31536000" always;
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -150,6 +152,16 @@ sudo -u joplin /opt/joplin/scripts/restore.sh \
 ```
 
 Скрипт интерактивно требует подтверждения. **Уничтожает текущие данные.**
+
+Перед DROP схемы скрипт автоматически снимает safety-дамп в
+`/var/backups/joplin/pre-restore-<timestamp>.dump.gz` (его путь печатается
+в конце). Скрипт берёт тот же `flock` что и `backup.sh`, поэтому с cron
+не пересечётся (в случае коллизии — ждёт окончания бэкапа).
+
+При ошибке посередине БД остаётся в полу-восстановленном состоянии.
+ERR-trap пытается поднять `app` обратно. Re-run с тем же дампом (или
+с safety-дампом) безопасен — `DROP SCHEMA public CASCADE; CREATE SCHEMA public;`
+сбрасывает любое промежуточное состояние.
 
 ### Обновление версии Joplin Server
 
@@ -182,6 +194,26 @@ cd /opt/joplin
 sudo -u joplin docker compose logs -f app
 sudo -u joplin docker compose logs -f db
 sudo tail -f /var/log/joplin-backup.log
+```
+
+### Где секреты и cron-задача
+
+`POSTGRES_PASSWORD` хранится в `/opt/joplin/.env` (mode `0600`, владелец `joplin`).
+Прямой доступ к БД для отладки:
+
+```bash
+cd /opt/joplin
+sudo -u joplin bash -c 'set -a; source .env; set +a; \
+  docker compose exec -e PGPASSWORD="$POSTGRES_PASSWORD" db \
+    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+Cron-задача бэкапа (просмотр):
+
+```bash
+sudo crontab -u joplin -l
+# Ожидается одна строка:
+# 17 3 * * * /opt/joplin/scripts/backup.sh >> /var/log/joplin-backup.log 2>&1
 ```
 
 ## Footprint на VPS
