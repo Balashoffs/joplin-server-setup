@@ -53,6 +53,9 @@ if [[ -z "$CERTBOT_EMAIL" ]]; then
     exit 1
 fi
 
+# Освежить sudo timestamp заранее, чтобы пароль не запросили посреди долгого деплоя
+sudo -v
+
 # === Старт стека ===
 echo "==> docker compose pull"
 docker compose pull
@@ -70,7 +73,9 @@ NGINX_ENABLED=/etc/nginx/sites-enabled/owl.hello-vanilla.ru.conf
 
 echo "==> Установка nginx-конфига"
 sudo cp nginx/owl.hello-vanilla.ru.conf "$NGINX_AVAILABLE"
-[[ -L "$NGINX_ENABLED" ]] || sudo ln -s "$NGINX_AVAILABLE" "$NGINX_ENABLED"
+if [[ ! -L "$NGINX_ENABLED" ]] || [[ "$(readlink "$NGINX_ENABLED")" != "$NGINX_AVAILABLE" ]]; then
+    sudo ln -sfn "$NGINX_AVAILABLE" "$NGINX_ENABLED"
+fi
 sudo nginx -t
 sudo systemctl reload nginx
 
@@ -109,8 +114,11 @@ sudo chown joplin:joplin /var/log/joplin-backup.log
 # === Финальные проверки ===
 echo
 echo "==> Финальные проверки"
-curl -fsS https://owl.hello-vanilla.ru/api/ping >/dev/null \
-    && echo "  HTTPS ping OK"
+if curl -fsS https://owl.hello-vanilla.ru/api/ping >/dev/null; then
+    echo "  HTTPS ping OK"
+else
+    echo "  ВНИМАНИЕ: HTTPS ping FAILED"
+fi
 HTTP_CODE=$(curl -sIo /dev/null -w '%{http_code}' http://owl.hello-vanilla.ru/)
 if [[ "$HTTP_CODE" == "301" || "$HTTP_CODE" == "308" ]]; then
     echo "  HTTP→HTTPS редирект OK ($HTTP_CODE)"
