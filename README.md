@@ -245,6 +245,8 @@ cd /opt/joplin
 sudo -u joplin docker compose down -v
 
 # 2. Удалить данные и код
+# ВНИМАНИЕ: эта команда удалит все исторические дампы. Если хотите их сохранить —
+# пропустите /var/backups/joplin (или скопируйте куда-то заранее).
 sudo rm -rf /opt/joplin /var/backups/joplin /var/log/joplin-backup.log
 
 # 3. Снять nginx-конфиг

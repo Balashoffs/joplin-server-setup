@@ -26,7 +26,7 @@ fi
 exec 9>/var/lock/joplin-backup.lock
 flock 9   # блокирующий — ждём, если бэкап в процессе
 
-echo "==> Проверка целостности дампа"
+echo "==> Проверка целостности дампа (gzip)"
 gunzip -t "$DUMP"
 
 cd /opt/joplin
@@ -67,6 +67,9 @@ echo "  safety-дамп сохранён"
 
 # ERR-trap: при любой ошибке после этой точки гарантируем что app снова запущен
 trap 'rc=$?; echo "[restore] прервано на строке $LINENO (exit $rc), пытаюсь поднять app" >&2; docker compose start app >/dev/null 2>&1 || true; echo "Safety-дамп: $SAFETY" >&2; exit "$rc"' ERR
+
+echo "==> Проверка структуры pg_dump (до деструктивных операций)"
+gunzip -c "$DUMP" | docker compose exec -T db pg_restore --list >/dev/null
 
 echo "==> Остановка app"
 docker compose stop --timeout 30 app
