@@ -99,6 +99,37 @@ else
         --deploy-hook "systemctl reload nginx"
 fi
 
+# === Default-fallback (для запросов с неизвестным Host) ===
+DEFAULT_AVAILABLE=/etc/nginx/sites-available/00-default-fallback.conf
+DEFAULT_ENABLED=/etc/nginx/sites-enabled/00-default-fallback.conf
+
+echo "==> Установка default-fallback nginx-конфига"
+# Если активен Ubuntu's sites-enabled/default — отключаем его (наш fallback
+# заменяет default_server). Файл в sites-available/ оставляем, можно вернуть.
+if [[ -L /etc/nginx/sites-enabled/default ]]; then
+    echo "  отключаю sites-enabled/default (заменяется нашим fallback)"
+    sudo rm /etc/nginx/sites-enabled/default
+fi
+
+sudo cp nginx/00-default-fallback.conf "$DEFAULT_AVAILABLE"
+if [[ ! -L "$DEFAULT_ENABLED" ]] || [[ "$(readlink "$DEFAULT_ENABLED")" != "$DEFAULT_AVAILABLE" ]]; then
+    sudo ln -sfn "$DEFAULT_AVAILABLE" "$DEFAULT_ENABLED"
+fi
+
+# Проверяем nginx -t, при ошибке откатываем (убираем наш симлинк, возвращаем
+# Ubuntu default если он был).
+if ! sudo nginx -t 2>&1; then
+    echo "ОШИБКА: nginx -t упал после установки default-fallback. Откатываю." >&2
+    sudo rm -f "$DEFAULT_ENABLED"
+    if [[ -f /etc/nginx/sites-available/default ]]; then
+        sudo ln -sfn /etc/nginx/sites-available/default \
+            /etc/nginx/sites-enabled/default
+    fi
+    sudo nginx -t
+    exit 1
+fi
+sudo systemctl reload nginx
+
 # === Cron бэкапа ===
 CRON_LINE="17 3 * * * /opt/joplin/scripts/backup.sh >> /var/log/joplin-backup.log 2>&1"
 if ! sudo crontab -u joplin -l 2>/dev/null \

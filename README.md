@@ -28,7 +28,8 @@ Self-hosted развёртывание [Joplin Server](https://github.com/lauren
 ├── .env.example                  # шаблон env-файла
 ├── .env                          # НЕ КОММИТИТСЯ — секреты, генерируется deploy.sh
 ├── nginx/
-│   └── owl.hello-vanilla.ru.conf # стартовый 80-блок (certbot достроит 443)
+│   ├── owl.hello-vanilla.ru.conf # стартовый 80-блок (certbot достроит 443)
+│   └── 00-default-fallback.conf  # default-сервер для неизвестных Host
 ├── scripts/
 │   ├── bootstrap.sh              # подготовка VPS (root) — пакеты, Docker, UFW
 │   ├── deploy.sh                 # первичный деплой (joplin) — стек + SSL
@@ -151,6 +152,11 @@ sudo -u joplin bash -lc 'cd /opt/joplin && ./scripts/deploy.sh'
 - стек поднят (`docker compose ps`);
 - nginx-конфиг установлен в `/etc/nginx/sites-available/`, симлинк в `sites-enabled/`;
 - сертификат выпущен (`certbot certificates`);
+- установлен **default-fallback** для запросов с неизвестным `Host:` —
+  отдаёт стандартную nginx welcome-страницу. Использует тот же сертификат
+  (браузер увидит CN-mismatch при заходе на чужой домен — это ожидаемо).
+  Стандартный Ubuntu `sites-enabled/default` отключается (файл в
+  `sites-available/default` остаётся, можно вернуть);
 - cron-задача бэкапа в `crontab -u joplin -l`;
 - logrotate-конфиг в `/etc/logrotate.d/joplin-backup`.
 
@@ -276,6 +282,8 @@ sudo crontab -u joplin -l
 | `/var/backups/joplin/` | bootstrap | дампы pg_dump |
 | `/var/log/joplin-backup.log` | первый запуск backup.sh | лог бэкапов |
 | `/etc/nginx/sites-available/owl.hello-vanilla.ru.conf` + симлинк в `sites-enabled/` | deploy | конфиг nginx |
+| `/etc/nginx/sites-available/00-default-fallback.conf` + симлинк в `sites-enabled/` | deploy | default-сервер для неизвестных Host (welcome-страница) |
+| `/etc/nginx/sites-enabled/default` (Ubuntu) | удаляется deploy | заменён нашим fallback; файл `sites-available/default` остаётся |
 | `/etc/letsencrypt/live/owl.hello-vanilla.ru/` | certbot | сертификат |
 | `/etc/letsencrypt/renewal/owl.hello-vanilla.ru.conf` | certbot | конфиг автообновления |
 | crontab пользователя `joplin` | deploy | задача backup.sh |
@@ -301,9 +309,14 @@ sudo -u joplin docker compose down -v
 # пропустите /var/backups/joplin (или скопируйте куда-то заранее).
 sudo rm -rf /opt/joplin /var/backups/joplin /var/log/joplin-backup.log
 
-# 3. Снять nginx-конфиг
+# 3. Снять nginx-конфиг + default-fallback
 sudo rm -f /etc/nginx/sites-enabled/owl.hello-vanilla.ru.conf
 sudo rm -f /etc/nginx/sites-available/owl.hello-vanilla.ru.conf
+sudo rm -f /etc/nginx/sites-enabled/00-default-fallback.conf
+sudo rm -f /etc/nginx/sites-available/00-default-fallback.conf
+# (опционально) вернуть стандартный Ubuntu default:
+[ -f /etc/nginx/sites-available/default ] && \
+    sudo ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 sudo systemctl reload nginx
 
 # 4. Удалить сертификат
