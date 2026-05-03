@@ -91,7 +91,7 @@ rsync -av --exclude='.git' --exclude='data/' \
 На VPS:
 
 ```bash
-sudo mv /tmp/joplin-bootstrap /opt/joplin
+sudo mv /tmp/joplin-bootstrap/ /opt/joplin
 cd /opt/joplin
 
 # ВАЖНО: откройте scripts/bootstrap.sh и поправьте SSH_PORT,
@@ -120,6 +120,8 @@ sudo ./scripts/bootstrap.sh
 После завершения смените владельца проекта:
 
 ```bash
+sudo passwd joplin
+su joplin
 sudo chown -R joplin:joplin /opt/joplin
 ```
 

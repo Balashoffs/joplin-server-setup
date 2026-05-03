@@ -51,21 +51,39 @@ for pkg in "${PACKAGES[@]}"; do
     fi
 done
 
-# === Docker Engine + compose plugin ===
-if docker compose version >/dev/null 2>&1; then
-    echo "==> Docker уже установлен"
+# --- Docker (engine + buildx + compose plugin) ---------------------------
+# Если уже стоит — пропускаем; иначе ставим официальный docker-ce из репозитория Docker.
+if ! command -v docker >/dev/null 2>&1; then
+  say "Устанавливаем Docker Engine"
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+    | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+  chmod a+r /etc/apt/keyrings/docker.gpg
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+    | tee /etc/apt/sources.list.d/docker.list >/dev/null
+  apt-get update -y
+  DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  systemctl enable --now docker
+fi
+
+# --- Docker rights: ставим $DOCKER_USER в группу docker ------------------
+# Без этого `docker version` от имени SSH-юзера падает с
+#   "permission denied while trying to connect to the docker API at unix:///var/run/docker.sock"
+if [[ -n "$DOCKER_USER" ]] && id "$DOCKER_USER" >/dev/null 2>&1; then
+  if ! id -nG "$DOCKER_USER" | tr ' ' '\n' | grep -qx docker; then
+    say "Добавляем пользователя ${DOCKER_USER} в группу docker"
+    usermod -aG docker "$DOCKER_USER"
+    DOCKER_GROUP_ADDED=1
+  else
+    say "Пользователь ${DOCKER_USER} уже в группе docker"
+    DOCKER_GROUP_ADDED=0
+  fi
 else
-    echo "==> Установка Docker Engine + compose plugin"
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-        | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    chmod a+r /etc/apt/keyrings/docker.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-        > /etc/apt/sources.list.d/docker.list
-    apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-        docker-ce docker-ce-cli containerd.io \
-        docker-buildx-plugin docker-compose-plugin
+  echo "ВНИМАНИЕ: не указан пользователь для группы docker." >&2
+  echo "Передайте имя как первый аргумент: sudo bash $0 <username>" >&2
+  DOCKER_GROUP_ADDED=0
 fi
 
 # === Пользователь joplin ===
