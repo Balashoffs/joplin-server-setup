@@ -1,4 +1,4 @@
-# Joplin Server на VPS — owl.hello-vanilla.ru
+# Joplin Server на VPS — example.com
 
 Self-hosted развёртывание [Joplin Server](https://github.com/laurent22/joplin/tree/dev/packages/server)
 на VPS Ubuntu 22.04 с TLS через Let's Encrypt. Спроектировано как «хороший
@@ -28,7 +28,7 @@ Self-hosted развёртывание [Joplin Server](https://github.com/lauren
 ├── .env.example                  # шаблон env-файла
 ├── .env                          # НЕ КОММИТИТСЯ — секреты, генерируется deploy.sh
 ├── nginx/
-│   ├── owl.hello-vanilla.ru.conf # стартовый 80-блок (certbot достроит 443)
+│   ├── example.com.conf # стартовый 80-блок (certbot достроит 443)
 │   └── 00-default-fallback.conf  # default-сервер для неизвестных Host
 ├── scripts/
 │   ├── bootstrap.sh              # подготовка VPS (root) — пакеты, Docker, UFW
@@ -47,7 +47,7 @@ Self-hosted развёртывание [Joplin Server](https://github.com/lauren
 ### 1. Предусловия
 
 - VPS на Ubuntu 22.04 (других версий не поддерживается).
-- DNS A-запись `owl.hello-vanilla.ru → <IP VPS>` уже создана и распространилась.
+- DNS A-запись `example.com → <IP VPS>` уже создана и распространилась.
 - SSH-доступ root (или sudo).
 - Клонированный репозиторий на локальной машине.
 
@@ -60,7 +60,7 @@ Self-hosted развёртывание [Joplin Server](https://github.com/lauren
 SSH_PORT=2222                         # ← ваш нестандартный SSH-порт
 SSH_KEY="$HOME/.ssh/id_ed25519"       # ← путь к приватному ключу
 VPS_USER=ubuntu                       # ← ваш пользователь на VPS
-VPS_HOST=owl.hello-vanilla.ru         # ← IP или домен VPS
+VPS_HOST=example.com         # ← IP или домен VPS
 
 rsync -av --exclude='.git' --exclude='data/' \
   -e "ssh -p ${SSH_PORT} -i ${SSH_KEY}" \
@@ -72,7 +72,7 @@ rsync -av --exclude='.git' --exclude='data/' \
 
 ```sshconfig
 Host joplin-vps
-    HostName owl.hello-vanilla.ru
+    HostName example.com
     User ubuntu
     Port 2222
     IdentityFile ~/.ssh/id_ed25519
@@ -164,7 +164,7 @@ sudo -u joplin bash -lc 'cd /opt/joplin && ./scripts/deploy.sh'
 
 ### 5. Настройка Joplin
 
-Откройте `https://owl.hello-vanilla.ru` — войдите как:
+Откройте `https://example.com` — войдите как:
 
 ```
 admin@localhost / admin
@@ -179,7 +179,7 @@ admin@localhost / admin
 способ — `sudoedit`:
 
 ```bash
-sudoedit /etc/nginx/sites-available/owl.hello-vanilla.ru.conf
+sudoedit /etc/nginx/sites-available/example.com.conf
 # В блоке `server { listen 443 ssl; ... }` добавьте строку:
 #   add_header Strict-Transport-Security "max-age=31536000" always;
 sudo nginx -t && sudo systemctl reload nginx
@@ -240,7 +240,7 @@ sudo -u joplin docker compose pull
 sudo -u joplin docker compose up -d
 
 # 5. Проверка
-curl -fsS https://owl.hello-vanilla.ru/api/ping
+curl -fsS https://example.com/api/ping
 ```
 
 Никаких автоматических обновлений — всё руками после прочтения changelog.
@@ -283,11 +283,11 @@ sudo crontab -u joplin -l
 | `/opt/joplin/` | bootstrap + deploy | код, `.env`, `data/postgres/` |
 | `/var/backups/joplin/` | bootstrap | дампы pg_dump |
 | `/var/log/joplin-backup.log` | первый запуск backup.sh | лог бэкапов |
-| `/etc/nginx/sites-available/owl.hello-vanilla.ru.conf` + симлинк в `sites-enabled/` | deploy | конфиг nginx |
+| `/etc/nginx/sites-available/example.com.conf` + симлинк в `sites-enabled/` | deploy | конфиг nginx |
 | `/etc/nginx/sites-available/00-default-fallback.conf` + симлинк в `sites-enabled/` | deploy | default-сервер для неизвестных Host (welcome-страница) |
 | `/etc/nginx/sites-enabled/default` (Ubuntu) | удаляется deploy | заменён нашим fallback; файл `sites-available/default` остаётся |
-| `/etc/letsencrypt/live/owl.hello-vanilla.ru/` | certbot | сертификат |
-| `/etc/letsencrypt/renewal/owl.hello-vanilla.ru.conf` | certbot | конфиг автообновления |
+| `/etc/letsencrypt/live/example.com/` | certbot | сертификат |
+| `/etc/letsencrypt/renewal/example.com.conf` | certbot | конфиг автообновления |
 | crontab пользователя `joplin` | deploy | задача backup.sh |
 | `/etc/logrotate.d/joplin-backup` | deploy | ротация логов |
 | Системный пользователь `joplin` (uid auto), группа `docker` | bootstrap | владелец стека |
@@ -312,8 +312,8 @@ sudo -u joplin docker compose down -v
 sudo rm -rf /opt/joplin /var/backups/joplin /var/log/joplin-backup.log
 
 # 3. Снять nginx-конфиг + default-fallback
-sudo rm -f /etc/nginx/sites-enabled/owl.hello-vanilla.ru.conf
-sudo rm -f /etc/nginx/sites-available/owl.hello-vanilla.ru.conf
+sudo rm -f /etc/nginx/sites-enabled/example.com.conf
+sudo rm -f /etc/nginx/sites-available/example.com.conf
 sudo rm -f /etc/nginx/sites-enabled/00-default-fallback.conf
 sudo rm -f /etc/nginx/sites-available/00-default-fallback.conf
 # (опционально) вернуть стандартный Ubuntu default:
@@ -322,7 +322,7 @@ sudo rm -f /etc/nginx/sites-available/00-default-fallback.conf
 sudo systemctl reload nginx
 
 # 4. Удалить сертификат
-sudo certbot delete --cert-name owl.hello-vanilla.ru
+sudo certbot delete --cert-name example.com
 
 # 5. Удалить cron-задачу
 sudo crontab -u joplin -e   # удалить строку с backup.sh
@@ -342,9 +342,9 @@ sudo userdel -r joplin
 
 После первого деплоя:
 
-- [ ] `https://owl.hello-vanilla.ru` открывается в браузере, загружается web UI Joplin
-- [ ] `curl -fsS https://owl.hello-vanilla.ru/api/ping` возвращает 200
-- [ ] `curl -sI http://owl.hello-vanilla.ru/ | head -1` показывает `301 Moved Permanently`
+- [ ] `https://example.com` открывается в браузере, загружается web UI Joplin
+- [ ] `curl -fsS https://example.com/api/ping` возвращает 200
+- [ ] `curl -sI http://example.com/ | head -1` показывает `301 Moved Permanently`
 - [ ] [SSL Labs](https://www.ssllabs.com/ssltest/) для домена показывает A или выше
 - [ ] `sudo certbot certificates` показывает expiry > 60 дней
 - [ ] `systemctl list-timers | grep certbot` — таймер активен

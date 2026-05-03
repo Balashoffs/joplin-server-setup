@@ -74,11 +74,11 @@ docker compose up -d
 #echo "  Joplin отвечает локально"
 
 # === Nginx ===
-NGINX_AVAILABLE=/etc/nginx/sites-available/owl.hello-vanilla.ru.conf
-NGINX_ENABLED=/etc/nginx/sites-enabled/owl.hello-vanilla.ru.conf
+NGINX_AVAILABLE=/etc/nginx/sites-available/example.com.conf
+NGINX_ENABLED=/etc/nginx/sites-enabled/example.com.conf
 
 echo "==> Установка nginx-конфига"
-sudo cp nginx/owl.hello-vanilla.ru.conf "$NGINX_AVAILABLE"
+sudo cp nginx/example.com.conf "$NGINX_AVAILABLE"
 if [[ ! -L "$NGINX_ENABLED" ]] || [[ "$(readlink "$NGINX_ENABLED")" != "$NGINX_AVAILABLE" ]]; then
     sudo ln -sfn "$NGINX_AVAILABLE" "$NGINX_ENABLED"
 fi
@@ -87,12 +87,12 @@ sudo systemctl reload nginx
 
 # === Certbot ===
 if sudo certbot certificates 2>/dev/null \
-    | grep -q "Certificate Name: owl.hello-vanilla.ru"; then
+    | grep -q "Certificate Name: example.com"; then
     echo "==> Сертификат уже выпущен, пропускаю certbot"
 else
     echo "==> Выпуск сертификата Let's Encrypt"
     sudo certbot --nginx \
-        -d owl.hello-vanilla.ru \
+        -d example.com \
         -m "$CERTBOT_EMAIL" \
         --agree-tos --no-eff-email \
         --redirect \
@@ -151,24 +151,24 @@ sudo chown joplin:joplin /var/log/joplin-backup.log
 # === Финальные проверки ===
 echo
 echo "==> Финальные проверки"
-if curl -fsS https://owl.hello-vanilla.ru/api/ping >/dev/null; then
+if curl -fsS https://example.com/api/ping >/dev/null; then
     echo "  HTTPS ping OK"
 else
     echo "  ВНИМАНИЕ: HTTPS ping FAILED"
 fi
-HTTP_CODE=$(curl -sIo /dev/null -w '%{http_code}' http://owl.hello-vanilla.ru/)
+HTTP_CODE=$(curl -sIo /dev/null -w '%{http_code}' http://example.com/)
 if [[ "$HTTP_CODE" == "301" || "$HTTP_CODE" == "308" ]]; then
     echo "  HTTP→HTTPS редирект OK ($HTTP_CODE)"
 else
     echo "  ВНИМАНИЕ: HTTP вернул $HTTP_CODE (ожидалось 301/308)"
 fi
 sudo certbot certificates 2>/dev/null \
-    | grep -A2 "owl.hello-vanilla.ru" || true
+    | grep -A2 "example.com" || true
 
 cat <<'EOF'
 
 ==> Деплой завершён.
-URL: https://owl.hello-vanilla.ru
+URL: https://example.com
 Дефолтные креды: admin@localhost / admin
 ВАЖНО: войдите и НЕМЕДЛЕННО смените пароль и email админа.
 
